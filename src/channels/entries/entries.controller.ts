@@ -130,33 +130,35 @@ export class EntriesController {
         @Param('entryId') entryId: string,
     ): Promise<void> {
         const [err] = await this.entriesService.deleteEntry(channelId, entryId);
-        switch (err) {
-            case 'ERR_CHANNEL_NOT_FOUND': {
-                throw new BadRequestException(
-                    'The requested channel could not be found.',
-                    { description: err },
-                );
-            }
+        if (err) {
+            switch (err) {
+                case 'ERR_CHANNEL_NOT_FOUND': {
+                    throw new BadRequestException(
+                        'The requested channel could not be found.',
+                        { description: err },
+                    );
+                }
 
-            case 'ERR_ENTRY_NOT_FOUND': {
-                throw new BadRequestException(
-                    'The requested entry could not be found.',
-                    { description: err },
-                );
-            }
+                case 'ERR_ENTRY_NOT_FOUND': {
+                    throw new BadRequestException(
+                        'The requested entry could not be found.',
+                        { description: err },
+                    );
+                }
 
-            case 'ERR_ES_UNSUCCESSFUL_DELETE': {
-                throw new InternalServerErrorException(
-                    'The Elasticsearch document could not be deleted. Please try again.',
-                    { description: err },
-                );
-            }
+                case 'ERR_ES_UNSUCCESSFUL_DELETE': {
+                    throw new InternalServerErrorException(
+                        'The Elasticsearch document could not be deleted. Please try again.',
+                        { description: err },
+                    );
+                }
 
-            default: {
-                throw new InternalServerErrorException(
-                    'An unhandled error has ocurred.',
-                    { description: err },
-                );
+                default: {
+                    throw new InternalServerErrorException(
+                        'An unhandled error has ocurred.',
+                        { description: err },
+                    );
+                }
             }
         }
     }

@@ -2,40 +2,101 @@ import { elastic } from '@/lib/elastic';
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 
+type TEsCatIndeciesResponse = Awaited<ReturnType<typeof elastic.cat.indices>>;
+
+type TGetChannelsError = 'ERR_ES_UNSUCCESSFUL_RESPONSE';
+
+type TEsCreateIndexResponse = Awaited<
+    ReturnType<typeof elastic.indices.create>
+>;
+
+type TCreateChannelError = 'ERR_ES_UNSUCCESSFUL_RESPONSE';
+
+type TEsIndex = Awaited<ReturnType<typeof elastic.indices.get>>;
+
+type TGetChannelError =
+    | 'ERR_CHANNEL_NOT_FOUND'
+    | 'ERR_ES_UNSUCCESSFUL_RESPONSE';
+
+type TDeleteChannelError =
+    | 'ERR_CHANNEL_NOT_FOUND'
+    | 'ERR_ES_UNSUCCESSFUL_DELETE';
+
 @Injectable()
 export class ChannelsService {
-    async getChannels() {
-        const channels = await elastic.cat.indices({ format: 'json' });
-
-        return channels;
+    private isEs404(e: any) {
+        return (
+            'meta' in e && 'statusCode' in e.meta && e.meta.statusCode === 404
+        );
     }
 
-    async createChannel() {
+    async getChannels(): Promise<
+        [TGetChannelsError] | [null, TEsCatIndeciesResponse]
+    > {
+        let channels: TEsCatIndeciesResponse | undefined;
+        try {
+            channels = await elastic.cat.indices({ format: 'json' });
+        } catch {
+            return ['ERR_ES_UNSUCCESSFUL_RESPONSE'];
+        }
+
+        return [null, channels];
+    }
+
+    async createChannel(): Promise<
+        [TCreateChannelError] | [null, TEsCreateIndexResponse]
+    > {
         const channelId = randomUUID();
 
-        const channel = await elastic.indices.create({
-            index: channelId,
-            mappings: {
-                properties: {
-                    group: { type: 'keyword' },
-                    message: { type: 'text' },
-                    metadata: { type: 'object' },
-                    timestamp: { type: 'date' },
-                    inserted: { type: 'date' },
+        let channel: TEsCreateIndexResponse | undefined;
+        try {
+            channel = await elastic.indices.create({
+                index: channelId,
+                mappings: {
+                    properties: {
+                        group: { type: 'keyword' },
+                        message: { type: 'text' },
+                        metadata: { type: 'object' },
+                        timestamp: { type: 'date' },
+                        inserted: { type: 'date' },
+                    },
                 },
-            },
-        });
+            });
+        } catch {
+            return ['ERR_ES_UNSUCCESSFUL_RESPONSE'];
+        }
 
-        return channel;
+        return [null, channel];
     }
 
-    async getChannel(id: string) {
-        const channel = await elastic.indices.get({ index: id });
+    async getChannelById(
+        id: string,
+    ): Promise<[TGetChannelError] | [null, TEsIndex]> {
+        let channel: TEsIndex | undefined;
+        try {
+            channel = await elastic.indices.get({ index: id });
+        } catch (e) {
+            if (this.isEs404(e)) {
+                return ['ERR_CHANNEL_NOT_FOUND'];
+            }
 
-        return channel;
+            return ['ERR_ES_UNSUCCESSFUL_RESPONSE'];
+        }
+
+        return [null, channel];
     }
 
-    async deleteChannel(id: string) {
-        await elastic.indices.delete({ index: id });
+    async deleteChannel(id: string): Promise<[TDeleteChannelError] | [null]> {
+        try {
+            await elastic.indices.delete({ index: id });
+        } catch (e) {
+            if (this.isEs404(e)) {
+                return ['ERR_CHANNEL_NOT_FOUND'];
+            }
+
+            return ['ERR_ES_UNSUCCESSFUL_DELETE'];
+        }
+
+        return [null];
     }
 }
