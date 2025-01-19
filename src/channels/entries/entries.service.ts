@@ -20,7 +20,11 @@ export type TFormatEntryError =
 
 export type TCreateEntryError = 'ERR_ES_UNSUCCESSFUL_RESPONSE';
 
-export type TGetEntryByIdError = TFormatEntryError;
+export type TGetEntryByIdError =
+    | TFormatEntryError
+    | 'ERR_ENTRY_NOT_FOUND'
+    | 'ERR_ES_UNSUCCESSFUL_RESPONSE'
+    | 'ERR_CHANNEL_NOT_FOUND';
 
 export type TGetEntriesError =
     | 'ERR_ES_UNSUCCESSFUL_SEARCH'
@@ -130,10 +134,24 @@ export class EntriesService {
         channel: string,
         id: string,
     ): Promise<[TGetEntryByIdError] | [null, TEntry]> {
-        const entry = await elastic.get({
-            index: channel,
-            id,
-        });
+        const indexExists = await elastic.indices.exists({ index: channel });
+        if (!indexExists) {
+            return ['ERR_CHANNEL_NOT_FOUND'];
+        }
+
+        let entry: Awaited<ReturnType<typeof elastic.get>> | undefined;
+        try {
+            entry = await elastic.get({
+                index: channel,
+                id,
+            });
+        } catch (e) {
+            if (this.isEs404(e)) {
+                return ['ERR_ENTRY_NOT_FOUND'];
+            }
+
+            return ['ERR_ES_UNSUCCESSFUL_RESPONSE'];
+        }
 
         const [err, fmtdEntry] = this.formatEntry(entry);
         if (err) {

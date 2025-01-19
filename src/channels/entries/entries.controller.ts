@@ -7,6 +7,7 @@ import {
     Get,
     HttpCode,
     InternalServerErrorException,
+    NotFoundException,
     Param,
     Post,
 } from '@nestjs/common';
@@ -101,6 +102,20 @@ export class EntriesController {
         }
 
         switch (err) {
+            case 'ERR_ENTRY_NOT_FOUND': {
+                throw new NotFoundException(
+                    'No entry with the requested ID could be found.',
+                    { description: err },
+                );
+            }
+
+            case 'ERR_CHANNEL_NOT_FOUND': {
+                throw new NotFoundException(
+                    'The requested channel could not be found.',
+                    { description: err },
+                );
+            }
+
             case 'ERR_ES_SOURCE_NOT_ACCESSIBLE': {
                 throw new InternalServerErrorException(
                     'The _source object of the entry document in Elasticsearch could not be accessed.',
@@ -111,6 +126,13 @@ export class EntriesController {
             case 'ERR_ES_SOURCE_KEYS_NOT_ALL_ACCESSIBLE': {
                 throw new InternalServerErrorException(
                     'Not all required keys of the _source objectr of the entry document in Elasticsearch could be accessed.',
+                    { description: err },
+                );
+            }
+
+            case 'ERR_ES_UNSUCCESSFUL_RESPONSE': {
+                throw new InternalServerErrorException(
+                    'Elasticsearch could not retrieve the entry, please try again.',
                     { description: err },
                 );
             }
@@ -133,14 +155,14 @@ export class EntriesController {
         if (err) {
             switch (err) {
                 case 'ERR_CHANNEL_NOT_FOUND': {
-                    throw new BadRequestException(
+                    throw new NotFoundException(
                         'The requested channel could not be found.',
                         { description: err },
                     );
                 }
 
                 case 'ERR_ENTRY_NOT_FOUND': {
-                    throw new BadRequestException(
+                    throw new NotFoundException(
                         'The requested entry could not be found.',
                         { description: err },
                     );
