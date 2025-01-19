@@ -1,4 +1,5 @@
 import { elastic } from '@/lib/elastic';
+import { Result } from '@/lib/types';
 import { SearchHitsMetadata } from '@elastic/elasticsearch/lib/api/types';
 import { SearchResponse } from '@elastic/elasticsearch/lib/api/typesWithBodyKey';
 import { Injectable } from '@nestjs/common';
@@ -30,17 +31,15 @@ export type TGetEntriesError =
     | 'ERR_ES_UNSUCCESSFUL_SEARCH'
     | 'ERR_CHANNEL_NOT_FOUND';
 
-export type TGetEntriesResponse =
-    | [TGetEntriesError]
-    | [
-          null,
-          {
-              entries: TEntry[];
-              elasticsearch: Omit<SearchResponse, 'hits'> & {
-                  hits: Omit<SearchHitsMetadata, 'hits'>;
-              };
-          },
-      ];
+export type TGetEntriesResponse = Result<
+    {
+        entries: TEntry[];
+        elasticsearch: Omit<SearchResponse, 'hits'> & {
+            hits: Omit<SearchHitsMetadata, 'hits'>;
+        };
+    },
+    TGetEntriesError
+>;
 
 export type TDeleteEntryError =
     | 'ERR_ES_UNSUCCESSFUL_DELETE'
@@ -51,7 +50,7 @@ export type TDeleteEntryError =
 export class EntriesService {
     private formatEntry(
         entry: Awaited<ReturnType<typeof elastic.get>>,
-    ): [TFormatEntryError] | [null, TEntry] {
+    ): Result<TEntry, TFormatEntryError> {
         if (typeof entry._source !== 'object' || entry._source === null) {
             return ['ERR_ES_SOURCE_NOT_ACCESSIBLE'];
         }
@@ -96,7 +95,7 @@ export class EntriesService {
         message: string,
         metadata: any,
         timestamp: Date,
-    ): Promise<[TCreateEntryError] | [null, TEntry]> {
+    ): Promise<Result<TEntry, TCreateEntryError>> {
         const entryId = randomUUID();
         const inserted = new Date();
 
@@ -133,7 +132,7 @@ export class EntriesService {
     async getEntryById(
         channel: string,
         id: string,
-    ): Promise<[TGetEntryByIdError] | [null, TEntry]> {
+    ): Promise<Result<TEntry, TGetEntryByIdError>> {
         const indexExists = await elastic.indices.exists({ index: channel });
         if (!indexExists) {
             return ['ERR_CHANNEL_NOT_FOUND'];
@@ -230,7 +229,7 @@ export class EntriesService {
     async deleteEntry(
         channel: string,
         id: string,
-    ): Promise<[TDeleteEntryError] | [null]> {
+    ): Promise<Result<void, TDeleteEntryError>> {
         const indexExists = await elastic.indices.exists({ index: channel });
         if (!indexExists) {
             return ['ERR_CHANNEL_NOT_FOUND'];

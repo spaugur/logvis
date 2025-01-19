@@ -1,4 +1,5 @@
 import { elastic } from '@/lib/elastic';
+import { Result } from '@/lib/types';
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 
@@ -31,7 +32,7 @@ export class ChannelsService {
     }
 
     async getChannels(): Promise<
-        [TGetChannelsError] | [null, TEsCatIndeciesResponse]
+        Result<TEsCatIndeciesResponse, TGetChannelsError>
     > {
         let channels: TEsCatIndeciesResponse | undefined;
         try {
@@ -44,7 +45,7 @@ export class ChannelsService {
     }
 
     async createChannel(): Promise<
-        [TCreateChannelError] | [null, TEsCreateIndexResponse]
+        Result<TEsCreateIndexResponse, TCreateChannelError>
     > {
         const channelId = randomUUID();
 
@@ -71,7 +72,7 @@ export class ChannelsService {
 
     async getChannelById(
         id: string,
-    ): Promise<[TGetChannelError] | [null, TEsIndex]> {
+    ): Promise<Result<TEsIndex, TGetChannelError>> {
         let channel: TEsIndex | undefined;
         try {
             channel = await elastic.indices.get({ index: id });
@@ -86,7 +87,9 @@ export class ChannelsService {
         return [null, channel];
     }
 
-    async deleteChannel(id: string): Promise<[TDeleteChannelError] | [null]> {
+    async deleteChannel(
+        id: string,
+    ): Promise<Result<void, TDeleteChannelError>> {
         try {
             await elastic.indices.delete({ index: id });
         } catch (e) {
