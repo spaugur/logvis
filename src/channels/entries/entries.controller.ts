@@ -9,22 +9,57 @@ import {
     InternalServerErrorException,
     NotFoundException,
     Param,
+    PipeTransform,
     Post,
+    Query,
 } from '@nestjs/common';
 import { EntriesService, TEntry } from './entries.service';
 import { TResponseData } from '@/lib/types';
 
 const ParseDatePipe = new DefaultValuePipe(() => new Date());
 
+class ParseOptionalBoolPipe implements PipeTransform {
+    transform(value: any) {
+        if (value === true) {
+            return true;
+        }
+
+        if (value === 'true') {
+            return true;
+        }
+
+        if (value === '1') {
+            return true;
+        }
+
+        if (value === 1) {
+            return true;
+        }
+
+        return false;
+    }
+}
+
 @Controller('channels/:channelId/entries')
 export class EntriesController {
     constructor(private entriesService: EntriesService) {}
 
     @Get()
-    async getEntries(@Param('channelId') channelId: string) {
+    async getEntries(
+        @Param('channelId') channelId: string,
+        @Query('includeEsDiagnostics', ParseOptionalBoolPipe)
+        includeEsDiagnostics: boolean,
+    ): Promise<TResponseData<any> & { elasticsearch?: any }> {
         const [err, entries] = await this.entriesService.getEntries(channelId);
         if (!err) {
-            return entries;
+            if (includeEsDiagnostics) {
+                return {
+                    data: entries.entries,
+                    elasticsearch: entries.elasticsearch,
+                };
+            }
+
+            return { data: entries.entries };
         }
 
         switch (err) {
